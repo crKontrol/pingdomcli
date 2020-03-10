@@ -58,11 +58,13 @@ def get_teams_by_name(auth, name, idt):
                 return team_out
     
     elif (idt == "True"):
-
+        
+        idtms_out = []
         for idtms in obj["teams"]:
-            idtms_out = []
-            idtms_out.append(idtms['id'])
-            print(idtms_out)
+            if idtms is not None:
+                idtms_out.append(idtms["id"])
+        return idtms_out
+
     else :
 
         obj_out = json.dumps(obj, indent=4)
@@ -71,6 +73,37 @@ def get_teams_by_name(auth, name, idt):
     return None
 
 # -----------------------------------------------------------------------------
+
+def get_teams_by_id(auth, name):
+    reqteams = requests.get("https://api.pingdom.com/api/3.1/alerting/teams",
+        headers = {
+            'Authorization': 'Bearer ' + auth
+        }
+    )
+
+    if reqteams.status_code != 200:
+        raise Exception('Request check failed. Response code is :{}'.format(reqteams.status_code))
+        return False
+
+    obj = json.loads(reqteams.text)
+
+    if (name != 'all'):
+
+        for team in obj["teams"]:
+            if team["name"] == name:
+                team_out = json.dumps(team["id"], indent=4)
+                return team_out
+    else :
+
+        obj_out = []
+        for team in obj["teams"]:
+            obj_out.append(team["id"])
+        return obj_out
+
+    return None
+
+# -----------------------------------------------------------------------------
+
 
 def get_maintenances(auth):
     reqmnt = requests.get("https://api.pingdom.com/api/3.1/maintenance",
@@ -117,7 +150,6 @@ def create_maintenance(auth, json_mnt):
     headers = {
         'Authorization' : 'Bearer ' + auth,
         'Content-type': 'application/json',
-        'Accept': 'text/plain'
     }
 
     reqcreate = requests.post(
@@ -210,7 +242,6 @@ def args2json(args):
     return json_check
 
 
-
 # -----------------------------------------------------------------------------
 
 def args2json_mnt(args):
@@ -220,7 +251,6 @@ def args2json_mnt(args):
         "from" : args.start,
         "to" : args.end,
         "uptimeids" : args.cid,
-        "encryption" : "true"
     }
 
     return json_mnt
@@ -235,12 +265,12 @@ def set_check(args):
     check = get_check_by_name(args.auth, args.name)
     json_check = args2json(args)
 
-    if check == None:
+    if check is None:
     
         # It doesn't then let's create it
         create_check(args.auth, json_check)
 
-    elif check != None:
+    elif check is not None:
 
         checkout_json = json.loads(check)
 
@@ -280,7 +310,7 @@ def del_check(args):
     check = get_check_by_name(args.auth, args.name)
     checkout_json = json.loads(check)
     
-    if check == None:
+    if check is None:
         print("No existent check with name "+args.name+". Nothing to delete")
 
     else:
@@ -289,16 +319,16 @@ def del_check(args):
 # -----------------------------------------------------------------------------
 
 def get_check(args):
-
     print(get_check_by_name(args.auth, args.name))
 
 def get_teams(args):
-
     print(get_teams_by_name(args.auth, args.name, args.idt))
 
 def get_maintenance(args):
-
     print(get_maintenances(args.auth))
+
+def get_teams_id(args):
+    print(get_teams_by_id(args.auth, args.name))
 
 
 # Main
@@ -333,15 +363,25 @@ def main ():
     parser_teams.add_argument("-i", "--id", default=False, help="ID of the teams - None is nothing at the end of the list, ignore it!", dest='idt')
     parser_teams.set_defaults(func=get_teams)
 
-    parser_mnt = subparser.add_parser('maintenance', help="get maintenance windows")
+    parser_id = subparser.add_parser('id_teams', help="get ID teams")
+    parser_id.add_argument("-a", "--auth", required=True, help="Auth for API", dest='auth')
+    parser_id.add_argument("-n", "--name", default="all", help="id of the teams by name", dest='name')
+    parser_id.set_defaults(func=get_teams_id)
+
+    parser_mnt = subparser.add_parser('maintenance', help="set/del maintenance windows")
     parser_mnt.add_argument("-a", "--auth", required=True, help="Auth for API", dest='auth')
     parser_mnt.add_argument("-d", "--desc", required=True, help="Description for maintenance windows", dest='desc')
     parser_mnt.add_argument("-s", "--start", required=True, default=1, help="Start time for maintenance - Beware, by default start time is NOW", dest='start')
     parser_mnt.add_argument("-e", "--end", required=True, help="End time for maintenance", dest='end')
     parser_mnt.add_argument("-i", "--id", help="Get maintenance by ID", dest="idm")
     parser_mnt.add_argument("-c", "--checks", help="ID of checks to put in maintenance", dest='cid')
-    parser_mnt.add_argument("-d", "--delete", help="Delete maintenance windows - BE CAREFUL using IT - Can onluy delete future maintenance not current nor old ones", dest='del')
-    parser_mnt.set_defaults(func=get_maintenance)
+    parser_mnt.add_argument("-r", "--remove", help="Delete maintenance windows - BE CAREFUL using IT - Can only delete future maintenance not current nor old ones", dest='del')
+    parser_mnt.set_defaults(func=set_mnt)
+
+    parser_get_mnt = subparser.add_parser('get_maintenance', help='get maintenance windows')
+    parser_get_mnt.add_argument("-a", "--auth", required=True, help="Auth for API", dest='auth')
+    parser_get_mnt.add_argument("-i", "--id", help="Get maintenance by ID", dest="idm")
+    parser_get_mnt.set_defaults(func=get_maintenance)
 
     args = parser.parse_args()
     
